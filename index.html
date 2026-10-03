@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Bot Host</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f7f6; padding: 20px; text-align: center; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        input, button { width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        .bot-card { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 8px; text-align: left; }
+        .btn-start { background: #28a745; display: inline-block; width: auto; padding: 8px 15px; }
+        .btn-stop { background: #dc3545; display: inline-block; width: auto; padding: 8px 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>বট হোস্টিং প্যানেল</h2>
+    
+    <!-- Upload Section -->
+    <div style="border-bottom: 2px solid #eee; padding-bottom: 20px;">
+        <input type="text" id="username" placeholder="আপনার ইউজারনেম দিন (যেমন: ahad123)" required>
+        <input type="text" id="botName" placeholder="বটের নাম" required>
+        <input type="file" id="botFile" accept=".py" required>
+        <button onclick="uploadBot()">বট আপলোড করুন</button>
+        <p id="uploadStatus"></p>
+    </div>
+
+    <!-- Load Bots Section -->
+    <div style="margin-top: 20px;">
+        <button onclick="loadBots()" style="background: #17a2b8;">আমার বটগুলো রিফ্রেশ করুন</button>
+        <div id="botList"></div>
+    </div>
+</div>
+
+<script>
+    // ⚠️ নিচে আপনার Cloudflare টানেলের লিংকটি বসাতে হবে
+    const API_BASE_URL = "https://peers-shot-chicago-marketplace.trycloudflare.com"; 
+
+    async function uploadBot() {
+        const username = document.getElementById('username').value;
+        const botName = document.getElementById('botName').value;
+        const fileInput = document.getElementById('botFile').files[0];
+
+        if(!username || !fileInput) return alert("ইউজারনেম এবং ফাইল আবশ্যক!");
+
+        const formData = new FormData();
+        formData.append("username", username);
+        formData.append("bot_name", botName);
+        formData.append("bot_file", fileInput);
+
+        document.getElementById('uploadStatus').innerText = "আপলোড হচ্ছে...";
+        
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/upload`, { method: "POST", body: formData });
+            const data = await res.json();
+            document.getElementById('uploadStatus').innerText = data.message || "আপলোড সফল!";
+            loadBots();
+        } catch (e) {
+            document.getElementById('uploadStatus').innerText = "সার্ভার অফলাইন আছে বা লিংক ভুল!";
+        }
+    }
+
+    async function loadBots() {
+        const username = document.getElementById('username').value;
+        if(!username) return alert("আগে ইউজারনেম দিন!");
+
+        document.getElementById('botList').innerHTML = "লোড হচ্ছে...";
+        
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/bots/${username}`);
+            const bots = await res.json();
+            
+            let html = "";
+            bots.forEach(bot => {
+                html += `
+                <div class="bot-card">
+                    <h4>${bot.name} (${bot.filename})</h4>
+                    <p>স্ট্যাটাস: <b>${bot.status}</b></p>
+                    ${bot.status === 'Stopped' 
+                        ? `<button class="btn-start" onclick="actionBot(${bot.id}, 'start')">Start</button>` 
+                        : `<button class="btn-stop" onclick="actionBot(${bot.id}, 'stop')">Stop</button>`}
+                </div>`;
+            });
+            document.getElementById('botList').innerHTML = html || "আপনার কোনো বট নেই।";
+        } catch (e) {
+            document.getElementById('botList').innerHTML = "সার্ভারের সাথে কানেক্ট করা যাচ্ছে না। টারমাক্স चालू আছে কিনা চেক করুন।";
+        }
+    }
+
+    async function actionBot(botId, action) {
+        await fetch(`${API_BASE_URL}/api/${action}/${botId}`, { method: "POST" });
+        loadBots(); // রিফ্রেশ
+    }
+</script>
+
+</body>
+</html>
